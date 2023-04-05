@@ -1,18 +1,30 @@
 {
   "PEMSD4": {
-    "data_dir": "data/PEMSD4",
+    "data_dir": "/root/autodl-tmp/data/PEMSD4",
     "num_nodes": 307,
     "num_slots": 288,
     "normalization": "batch"
   },
   "PEMSD8": {
-    "data_dir": "data/PEMSD8",
+    "data_dir": "/root/autodl-tmp/data/PEMSD8",
     "num_nodes": 170,
     "num_slots": 288,
     "normalization": "batch"
   },
+  "METR-LA": {
+    "data_dir": "/root/autodl-tmp/data/METR-LA",
+    "num_nodes": 207,
+    "num_slots": 288,
+    "normalization": "batch"
+  },
+  "PEMS-BAY": {
+    "data_dir": "/root/autodl-tmp/data/PEMS-BAY",
+    "num_nodes": 325,
+    "num_slots": 288,
+    "normalization": "batch"
+  },
   "England": {
-    "data_dir": "data/England",
+    "data_dir": "/root/autodl-tmp/data/England",
     "num_nodes": 314,
     "num_slots": 96,
     "normalization": "layer"
