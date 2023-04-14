@@ -1,8 +1,8 @@
-# pooling3
+# pooling4dropout
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
 
 class nconv(nn.Module):
     def __init__(self):
@@ -226,23 +226,23 @@ class DMSTGCN(nn.Module):
             # tcn for primary part
             residual = x
             # print(x.shape)
-            filter = self.filter_convs[i](residual)
-            filter = torch.tanh(filter)
-            gate = self.gate_convs[i](residual)
-            gate = torch.sigmoid(gate)
-            x = filter * gate
-
+            x = self.filter_convs[i](residual)
+            # filter = torch.tanh(filter)
+            # gate = self.gate_convs[i](residual)
+            # gate = torch.sigmoid(gate)
+            # x = filter * gate
 
             # tcn for auxiliary part
             residual_a = x_a
             # print(x.shape)
-            filter_a = self.filter_convs_a[i](residual_a)
-            filter_a = torch.tanh(filter_a)
-            gate_a = self.gate_convs_a[i](residual_a)
-            gate_a = torch.sigmoid(gate_a)
-            x_a = filter_a * gate_a
+            x_a = self.filter_convs_a[i](residual_a)
+            # filter_a = torch.tanh(filter_a)
+            # gate_a = self.gate_convs_a[i](residual_a)
+            # gate_a = torch.sigmoid(gate_a)
+            # x_a = filter_a * gate_a
 
-
+            # zx = torch.einsum('ncvl,nwv->ncwl', (x, new_supports[i]))
+            # zx_a = torch.einsum('ncvl,nwv->ncwl', (x_a, new_supports_a[i]))
 
             # skip connection
             s = x
@@ -257,8 +257,10 @@ class DMSTGCN(nn.Module):
             x_a = self.gconv_a[i](x_a, [new_supports_a[i]])
             x_a = x_a[:,:,:,-x.size(3):]
 
+
             # multi-faceted fusion module
-            p = torch.cat((x, x_a),3)
+            # p = torch.cat((zx, zx_a),3)
+            p = torch.cat((x, x_a), 3)
             x_p = self.pooling(p)
             # x = x_p + x_a +x
             weight =[0.5,0.3,0.2]
@@ -276,57 +278,5 @@ class DMSTGCN(nn.Module):
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
         return x
-
-# class dilated_inception(nn.Module):
-#     def __init__(self, cin, cout, dilation_factor=2):
-#         super(dilated_inception, self).__init__()
-#         self.tconv = nn.ModuleList()
-#         self.h_conv = nn.ModuleList()
-#         self.kernel_set = [1,2,3,3]
-#         cout = int(cout/len(self.kernel_set))
-#         for kern in self.kernel_set:
-#             self.tconv.append(nn.Conv2d(cin, cout, (1, kern), dilation=(1, dilation_factor)))
-#
-#
-#     def forward(self, input):
-#         e = []
-#         h0 = input
-#         x = self.tconv[0](input)
-#         h0 = h0[:, -x.size(1):, :, -x.size(3):]
-#         print(x.shape,h0.shape)
-#         Z1 = torch.sigmoid(x + h0)
-#         R1 = torch.sigmoid(x + h0)
-#         H1_tilda = torch.tanh(x + (R1 * h0))
-#         h1 = Z1 * H1_tilda + (1 - Z1) * h0
-#         e.append(h1)
-#
-#         x = self.tconv[1](input)
-#         h1 = h1[:, -x.size(1):, :, -x.size(3):]
-#         Z2 = torch.sigmoid(x + h1)
-#         R2 = torch.sigmoid(x+ h1)
-#         H2_tilda = torch.tanh(x + (R2 * h1))
-#         h2 = Z2 * H2_tilda + (1 - Z2) * h1
-#         e.append(h2)
-#
-#         x = self.tconv[2](input)
-#         h2 = h2[:, -x.size(1):, :, -x.size(3):]
-#         Z3 = torch.sigmoid(x + h2)
-#         R3 = torch.sigmoid(x + h2)
-#         H3_tilda = torch.tanh(x + (R3 * h2))
-#         h3 = Z3 * H3_tilda + (1 - Z3) * h2
-#         e.append(h3)
-#
-#         x = self.tconv[3](input)
-#         h3 = h3[:, -x.size(1):, :, -x.size(3):]
-#         Z4 = torch.sigmoid(x + h3)
-#         R4 = torch.sigmoid(x + h3)
-#         H4_tilda = torch.tanh(x + (R4 * h3))
-#         h4 = Z4 * H4_tilda + (1 - Z4) * h3
-#         e.append(h4)
-#
-#         for i in range(len(self.kernel_set)):
-#             e[i] = e[i][..., -e[-1].size(3):]
-#         e = torch.cat(e, dim=1)
-#         return e
 
 
