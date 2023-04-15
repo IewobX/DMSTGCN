@@ -28,7 +28,7 @@
     "num_nodes": 314,
     "num_slots": 96,
     "normalization": "layer"
-  }
+  },
   "Ios": {
     "data_dir": "/root/autodl-tmp/data/Ios",
     "num_nodes": 207,
