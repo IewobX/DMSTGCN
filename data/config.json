@@ -29,7 +29,7 @@
     "num_slots": 96,
     "normalization": "layer"
   },
-  "Ios": {
+  "los": {
     "data_dir": "/kaggle/input/losh5/los",
     "num_nodes": 207,
     "num_slots": 288,
