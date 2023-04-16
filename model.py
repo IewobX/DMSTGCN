@@ -231,4 +231,4 @@ class DMSTGCN(nn.Module):
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
-        return 
+        return x
