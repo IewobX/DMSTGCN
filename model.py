@@ -1,8 +1,7 @@
-# pooling4dropout
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+
 
 class nconv(nn.Module):
     def __init__(self):
@@ -10,11 +9,9 @@ class nconv(nn.Module):
 
     def forward(self, x, A):
         x = torch.einsum('ncvl,nwv->ncwl', (x, A))
-        return x.contiguous()  # 把tensor变成在内存中连续分布的形式
-                               # torch.view等方法操作需要连续的Tensor；连续的Tensor，语义上相邻的元素，在内存中也是连续的，语义和内存顺序的一致性是缓存友好的，以提升CPU获取操作数据的速度
+        return x.contiguous()
 
-# 在某个数据上应用一个线性转换，公式表达就是y=xA^T+b
-# bias: 默认为True.如果设置成false，则这个线性层不会加上bias。值从均匀分布U(-\sqrt{k},\sqrt{k})中获取
+
 class linear(nn.Module):
     def __init__(self, c_in, c_out):
         super(linear, self).__init__()
@@ -47,6 +44,7 @@ class gcn(nn.Module):
         h = self.mlp(h)
         h = F.dropout(h, self.dropout, training=self.training)
         return h
+
 
 class DMSTGCN(nn.Module):
     def __init__(self, device, num_nodes, dropout=0.3,
@@ -85,7 +83,7 @@ class DMSTGCN(nn.Module):
         receptive_field = 1
 
         self.supports_len = 1
-        self.nodevec_p1 = nn.Parameter(torch.randn(days, dims).to(device), requires_grad=True).to(device) #requires_grad自动
+        self.nodevec_p1 = nn.Parameter(torch.randn(days, dims).to(device), requires_grad=True).to(device)
         self.nodevec_p2 = nn.Parameter(torch.randn(num_nodes, dims).to(device), requires_grad=True).to(device)
         self.nodevec_p3 = nn.Parameter(torch.randn(num_nodes, dims).to(device), requires_grad=True).to(device)
         self.nodevec_pk = nn.Parameter(torch.randn(dims, dims, dims).to(device), requires_grad=True).to(device)
@@ -97,8 +95,7 @@ class DMSTGCN(nn.Module):
         self.nodevec_a2p2 = nn.Parameter(torch.randn(num_nodes, dims).to(device), requires_grad=True).to(device)
         self.nodevec_a2p3 = nn.Parameter(torch.randn(num_nodes, dims).to(device), requires_grad=True).to(device)
         self.nodevec_a2pk = nn.Parameter(torch.randn(dims, dims, dims).to(device), requires_grad=True).to(device)
-        self.residual = residual_channels
-        self.diltational = dilation_channels
+
         for b in range(blocks):
             additional_scope = kernel_size - 1
             new_dilation = 1
@@ -111,13 +108,8 @@ class DMSTGCN(nn.Module):
                 self.gate_convs.append(nn.Conv2d(in_channels=residual_channels,
                                                  out_channels=dilation_channels,
                                                  kernel_size=(1, kernel_size), dilation=new_dilation))
-                # self.filter_convs.append(
-                #     dilated_inception(residual_channels, dilation_channels, dilation_factor=new_dilation))
-                #
-                # self.gate_convs.append(
-                #     dilated_inception(residual_channels, dilation_channels, dilation_factor=new_dilation))
 
-                self.residual_convs.append(nn.Conv1d(in_channels=dilation_channels,
+                self.residual_convs.append(nn.Conv2d(in_channels=dilation_channels,
                                                      out_channels=residual_channels,
                                                      kernel_size=(1, 1)))
 
@@ -132,13 +124,6 @@ class DMSTGCN(nn.Module):
                 self.gate_convs_a.append(nn.Conv2d(in_channels=residual_channels,
                                                    out_channels=dilation_channels,
                                                    kernel_size=(1, kernel_size), dilation=new_dilation))
-                self.pooling = torch.nn.MaxPool2d(kernel_size=(1, 2), stride=None, padding=0,
-                                                  return_indices=False, ceil_mode=False)
-                # self.filter_convs_a.append(
-                #     dilated_inception(residual_channels, dilation_channels, dilation_factor=new_dilation))
-                #
-                # self.gate_convs_a.append(
-                #     dilated_inception(residual_channels, dilation_channels, dilation_factor=new_dilation))
 
                 # 1x1 convolution for residual connection
                 self.residual_convs_a.append(nn.Conv2d(in_channels=dilation_channels,
@@ -162,13 +147,13 @@ class DMSTGCN(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
 
-        self.end_conv_1 = nn.Conv2d(in_channels=304,
-                                    out_channels=304,
+        self.end_conv_1 = nn.Conv2d(in_channels=skip_channels * (12 + 10 + 9 + 7 + 6 + 4 + 3 + 1),
+                                    out_channels=end_channels,
                                     kernel_size=(1, 1),
                                     bias=True)
 
-        self.end_conv_2 = nn.Conv2d(in_channels=304,
-                                    out_channels=12,
+        self.end_conv_2 = nn.Conv2d(in_channels=end_channels,
+                                    out_channels=out_dim,
                                     kernel_size=(1, 1),
                                     bias=True)
 
@@ -177,17 +162,9 @@ class DMSTGCN(nn.Module):
     def dgconstruct(self, time_embedding, source_embedding, target_embedding, core_embedding):
         adp = torch.einsum('ai, ijk->ajk', time_embedding, core_embedding)
         adp = torch.einsum('bj, ajk->abk', source_embedding, adp)
-        x = adp
         adp = torch.einsum('ck, abk->abc', target_embedding, adp)
-
-        temp = adp[:, :, :32]
-
-        x1 = torch.matmul(x, temp.transpose(1, 2))
-        x2 = torch.matmul(temp, x.transpose(1, 2))
-        adp = F.relu(F.tanh(x1 - x2))
-
+        adp = F.softmax(F.relu(adp), dim=2)
         return adp
-
 
     def forward(self, inputs, ind):
         """
@@ -195,7 +172,7 @@ class DMSTGCN(nn.Module):
         """
         in_len = inputs.size(3)
         if in_len < self.receptive_field:
-            xo = nn.functional.pad(inputs, (self.receptive_field - in_len, 0, 0, 0)) #填充区域
+            xo = nn.functional.pad(inputs, (self.receptive_field - in_len, 0, 0, 0))
         else:
             xo = inputs
         x = self.start_conv(xo[:, [0]])
@@ -203,72 +180,49 @@ class DMSTGCN(nn.Module):
         skip = 0
 
         # dynamic graph construction
-        new_supports = []
-        new_supports_a = []
+        adp = self.dgconstruct(self.nodevec_p1[ind], self.nodevec_p2, self.nodevec_p3, self.nodevec_pk)
+        adp_a = self.dgconstruct(self.nodevec_a1[ind], self.nodevec_a2, self.nodevec_a3, self.nodevec_ak)
+        adp_a2p = self.dgconstruct(self.nodevec_a2p1[ind], self.nodevec_a2p2, self.nodevec_a2p3, self.nodevec_a2pk)
+
+        new_supports = [adp]
+        new_supports_a = [adp_a]
+        new_supports_a2p = [adp_a2p]
 
         for i in range(self.blocks * self.layers):
-            adp = self.dgconstruct(self.nodevec_p1[ind], self.nodevec_p2, self.nodevec_p3, self.nodevec_pk)
-            adp_a = self.dgconstruct(self.nodevec_a1[ind], self.nodevec_a2, self.nodevec_a3, self.nodevec_ak)
-            # adp_a2p = self.dgconstruct(self.nodevec_a2p1[ind], self.nodevec_a2p2, self.nodevec_a2p3, self.nodevec_a2pk)
-
-            new_supports.append(adp)
-            new_supports_a.append(adp_a)
-            # new_supports_a2p.append(adp_a2p)
-
-        for i in range(self.layers * self.layers):
-            # weight = [0.3,0.7]
-            # if i == 0:
-            #     fusion_adp = new_supports[i]*weight[0]+new_supports[i]*weight[1]
-            #
-            # else:
-            #     fusion_adp = new_supports[i-1]*weight[0]+new_supports[i]*weight[1]
-
             # tcn for primary part
             residual = x
-            # print(x.shape)
-            x = self.filter_convs[i](residual)
-            # filter = torch.tanh(filter)
-            # gate = self.gate_convs[i](residual)
-            # gate = torch.sigmoid(gate)
-            # x = filter * gate
+            filter = self.filter_convs[i](residual)
+            filter = torch.tanh(filter)
+            gate = self.gate_convs[i](residual)
+            gate = torch.sigmoid(gate)
+            x = filter * gate
 
             # tcn for auxiliary part
             residual_a = x_a
-            # print(x.shape)
-            x_a = self.filter_convs_a[i](residual_a)
-            # filter_a = torch.tanh(filter_a)
-            # gate_a = self.gate_convs_a[i](residual_a)
-            # gate_a = torch.sigmoid(gate_a)
-            # x_a = filter_a * gate_a
-
-            # zx = torch.einsum('ncvl,nwv->ncwl', (x, new_supports[i]))
-            # zx_a = torch.einsum('ncvl,nwv->ncwl', (x_a, new_supports_a[i]))
+            filter_a = self.filter_convs_a[i](residual_a)
+            filter_a = torch.tanh(filter_a)
+            gate_a = self.gate_convs_a[i](residual_a)
+            gate_a = torch.sigmoid(gate_a)
+            x_a = filter_a * gate_a
 
             # skip connection
             s = x
             s = self.skip_convs[i](s)
-            if isinstance(skip, int):  # 判断两个类型是否相同
-                skip = s.transpose(2, 3).reshape([s.shape[0], -1, s.shape[2], 1]).contiguous()  #重塑输出的向量 # 输出张量第0维第2维 # 自动计算新的维数 # 保证Tensor是连续的
+            if isinstance(skip, int):  # B F N T
+                skip = s.transpose(2, 3).reshape([s.shape[0], -1, s.shape[2], 1]).contiguous()
             else:
                 skip = torch.cat([s.transpose(2, 3).reshape([s.shape[0], -1, s.shape[2], 1]), skip], dim=1).contiguous()
 
             # dynamic graph convolutions
-            x = self.gconv[i](x, [new_supports[i]])
-            x_a = self.gconv_a[i](x_a, [new_supports_a[i]])
-            x_a = x_a[:,:,:,-x.size(3):]
-
+            x = self.gconv[i](x, new_supports)
+            x_a = self.gconv_a[i](x_a, new_supports_a)
 
             # multi-faceted fusion module
-            # p = torch.cat((zx, zx_a),3)
-            p = torch.cat((x, x_a), 3)
-            x_p = self.pooling(p)
-            # x = x_p + x_a +x
-            weight =[0.5,0.3,0.2]
-            x = weight[0] * x + weight[1] * x_a+weight[2] * x_p
+            x_a2p = self.gconv_a2p[i](x_a, new_supports_a2p)
+            x = x_a2p + x
 
-            # residual and normalization ([64, 32, 307, 7])
+            # residual and normalization
             x_a = x_a + residual_a[:, :, :, -x_a.size(3):]
-            residual = x
             x = x + residual[:, :, :, -x.size(3):]
             x = self.normal[i](x)
             x_a = self.normal_a[i](x_a)
@@ -277,6 +231,4 @@ class DMSTGCN(nn.Module):
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
-        return x
-
-
+        return 
