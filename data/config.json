@@ -30,7 +30,7 @@
     "normalization": "layer"
   },
   "Ios": {
-    "data_dir": "/kaggle/input/iosh5/Ios",
+    "data_dir": "/kaggle/input/iosh5/los",
     "num_nodes": 207,
     "num_slots": 288,
     "normalization": "batch"
