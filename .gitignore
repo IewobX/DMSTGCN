@@ -1,2 +1,4 @@
 /save_models/*
 /.idea/*
+/data/*
+/__pycache__/*
