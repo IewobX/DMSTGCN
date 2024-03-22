@@ -1,3 +1,4 @@
+# cutgcn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -224,14 +225,14 @@ class DMSTGCN(nn.Module):
             R3 = torch.sigmoid(x + h2)
             H3_tilda = torch.tanh(x + (R3 * h2))
             h3 = Z3 * x + (1 - Z3) * H3_tilda
-            x = h3
+
             #channel attention
-            # avg_pool = nn.AdaptiveAvgPool2d((h3.size(-2),h3.size(-1))).to(self.device)
-            # max_pool = nn.AdaptiveMaxPool2d((h3.size(-2),h3.size(-1))).to(self.device)
-            # avg_out = self.fc2(self.relu1(self.fc1(avg_pool(residual))))
-            # max_out = self.fc2(self.relu1(self.fc1(max_pool(residual))))
-            # x = avg_out + max_out + h3
-            # x = torch.sigmoid(x)
+            avg_pool = nn.AdaptiveAvgPool2d((x.size(-2),x.size(-1))).to(self.device)
+            max_pool = nn.AdaptiveMaxPool2d((x.size(-2),x.size(-1))).to(self.device)
+            avg_out = self.fc2(self.relu1(self.fc1(avg_pool(residual))))
+            max_out = self.fc2(self.relu1(self.fc1(max_pool(residual))))
+            x = avg_out + max_out + x
+            x = torch.sigmoid(x)
 
             # filter = self.filter_convs[i](residual)
             # filter = torch.tanh(filter)
@@ -256,9 +257,9 @@ class DMSTGCN(nn.Module):
                 skip = torch.cat([s.transpose(2, 3).reshape([s.shape[0], -1, s.shape[2], 1]), skip], dim=1).contiguous()
 
             # dynamic graph convolutions
-            x = self.gconv[i](x, [new_supports[i]])
-            x_a = self.gconv_a[i](x_a, [new_supports_a[i]])
-            x = x[:,:,:,-x_a.size(3):]
+            # x = self.gconv[i](x, [new_supports[i]])
+            # x_a = self.gconv_a[i](x_a, [new_supports_a[i]])
+            # x = x[:,:,:,-x_a.size(3):]
             # multi-faceted fusion module
             # x_a2p = self.gconv_a2p[i](x_a, [new_supports_a2p[i]])
             x = x_a + x
